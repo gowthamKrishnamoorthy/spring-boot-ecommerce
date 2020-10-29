@@ -29,7 +29,6 @@ import com.gowtham.springbootecommerce.repository.ProductRepository;
  */
 @RestController
 @RequestMapping("/api/products")
-@CrossOrigin("*")
 public class ProductResource {
 
 	/** The product repository. */
