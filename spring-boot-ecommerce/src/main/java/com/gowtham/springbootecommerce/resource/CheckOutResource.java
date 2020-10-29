@@ -1,6 +1,8 @@
 package com.gowtham.springbootecommerce.resource;
 
 import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,6 +26,7 @@ import com.gowtham.springbootecommerce.model.CheckOut;
 import com.gowtham.springbootecommerce.model.User;
 import com.gowtham.springbootecommerce.repository.CheckoutRespository;
 import com.gowtham.springbootecommerce.repository.UserRepository;
+import com.gowtham.springbootecommerce.utils.EcommerceException;
 
 /**
  * The Class CheckOutResource.
@@ -35,6 +38,7 @@ import com.gowtham.springbootecommerce.repository.UserRepository;
 @RequestMapping("/api/checkout")
 @CrossOrigin("*")
 public class CheckOutResource {
+	Logger logger = LoggerFactory.getLogger(CheckOutResource.class);
 
 	/** The CheckOut repository. */
 	@Autowired
@@ -124,16 +128,19 @@ public class CheckOutResource {
 	 * @return all categories
 	 */
 	@PostMapping(value = "/checkout/{userName}")
-	public boolean checkout(@PathVariable String userName) {
+	public boolean checkout(@PathVariable String userName) throws EcommerceException {
 		Thread thread = new Thread(){
 			public void run(){
 				List<CheckOut>  userCheckoutDataList = checkoutRespository.findByUsername(userName);
 				if(!userCheckoutDataList.isEmpty()) {
 					try {
 						sendEmail(userCheckoutDataList);
+						checkoutRespository.deleteByUsername(userName);
 					} catch (MessagingException e) {
 						e.printStackTrace();
 					} catch (IOException e) {
+						e.printStackTrace();
+					} catch (EcommerceException e) {
 						e.printStackTrace();
 					}
 				}
@@ -143,15 +150,20 @@ public class CheckOutResource {
 		thread.start();
 		return true;
 	}
-	
+
 	/**
 	 * sendEmail is used to send the confimation mail to the user.
 	 * @param List 		userCheckoutDataList
 	 * @return all categories
+	 * @throws EcommerceException 
 	 */
-	void sendEmail(List<CheckOut> userCheckoutDataList)throws MessagingException, IOException {
+	void sendEmail(List<CheckOut> userCheckoutDataList)throws MessagingException, IOException, EcommerceException {
 
 		SimpleMailMessage msg = new SimpleMailMessage();
+		if(userCheckoutDataList.isEmpty()) {
+			logger.error("User not found");
+			throw new EcommerceException("");
+		}
 		String userName = userCheckoutDataList.get(0).getUsername();
 		User user = userRepository.findById(userName).get();
 		msg.setTo(user.getEmail());
