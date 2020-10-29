@@ -21,7 +21,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.gowtham.springbootecommerce.model.CheckOut;
+import com.gowtham.springbootecommerce.model.User;
 import com.gowtham.springbootecommerce.repository.CheckoutRespository;
+import com.gowtham.springbootecommerce.repository.UserRepository;
 
 /**
  * The Class CheckOutResource.
@@ -39,6 +41,9 @@ public class CheckOutResource {
 	private CheckoutRespository checkoutRespository;
 	@Autowired
 	private JavaMailSender javaMailSender;
+	/** The user repository. */
+	@Autowired
+	private UserRepository userRepository;
 
 	/**
 	 * Gets all CheckOut.
@@ -84,7 +89,8 @@ public class CheckOutResource {
 	 * @return all categories
 	 */
 	@PutMapping(value = "/put/{userName}")
-	public List<CheckOut> put(@PathVariable String userName, @RequestBody Integer productId,@RequestBody Integer quantity) {
+	public List<CheckOut> put(@PathVariable String userName, @RequestBody Integer productId,
+			@RequestBody Integer quantity,@RequestBody Boolean isIncrement) {
 		List<CheckOut>  userCheckoutDataList = checkoutRespository.findByUsername(userName);
 		List<CheckOut>  tempCheckoutDataList = new ArrayList<CheckOut>();
 		if(userCheckoutDataList.isEmpty()) {
@@ -92,9 +98,13 @@ public class CheckOutResource {
 			tempCheckoutDataList.add(userCheckoutData);
 		}else {
 			for(CheckOut userCheckoutData : userCheckoutDataList) {
-				CheckOut tempUserCheckoutData = new CheckOut(userCheckoutData.getUsername(), userCheckoutData.getProductId(), userCheckoutData.getQuantity());
+				CheckOut tempUserCheckoutData = new CheckOut(userCheckoutData.getUsername(),
+						userCheckoutData.getProductId(), userCheckoutData.getQuantity());
 				if(tempUserCheckoutData.getProductId() == productId) {
-					tempUserCheckoutData.setQuantity(tempUserCheckoutData.getQuantity()+1);
+					int modifiedQuantity = isIncrement ?
+							tempUserCheckoutData.getQuantity() + quantity 
+							: tempUserCheckoutData.getQuantity() + quantity;
+					tempUserCheckoutData.setQuantity(modifiedQuantity);
 				}
 				tempCheckoutDataList.add(tempUserCheckoutData);
 			}
@@ -108,39 +118,49 @@ public class CheckOutResource {
 	/**
 	 * post CheckOut.
 	 *
-	 * @param userName 		the userName
+	 * @param userName the userName
 	 * @param int  the productId
 	 * @param int the quantity
 	 * @return all categories
 	 */
 	@PostMapping(value = "/checkout/{userName}")
 	public boolean checkout(@PathVariable String userName) {
-		List<CheckOut>  userCheckoutDataList = checkoutRespository.findByUsername(userName);
-		if(userCheckoutDataList.isEmpty()) {
-			return false;
-		}else {
-			try {
-				sendEmail(userCheckoutDataList);
-			} catch (MessagingException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
+		Thread thread = new Thread(){
+			public void run(){
+				List<CheckOut>  userCheckoutDataList = checkoutRespository.findByUsername(userName);
+				if(!userCheckoutDataList.isEmpty()) {
+					try {
+						sendEmail(userCheckoutDataList);
+					} catch (MessagingException e) {
+						e.printStackTrace();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
 			}
-		}
+		};
 
+		thread.start();
 		return true;
 	}
+	
+	/**
+	 * sendEmail is used to send the confimation mail to the user.
+	 * @param List 		userCheckoutDataList
+	 * @return all categories
+	 */
 	void sendEmail(List<CheckOut> userCheckoutDataList)throws MessagingException, IOException {
 
 		SimpleMailMessage msg = new SimpleMailMessage();
 		String userName = userCheckoutDataList.get(0).getUsername();
-		
-		msg.setTo("abc@gmail.com");
-
-		msg.setSubject("Testing from Spring Boot");
-		msg.setText("Hello ${userName} \n Spring Boot Email");
+		User user = userRepository.findById(userName).get();
+		msg.setTo(user.getEmail());
+		msg.setSubject("Order conformation");
+		StringBuilder mailBody = new StringBuilder();
+		mailBody.append("Hello" + userName);
+		mailBody.append("\n" + "Your orders has been confirmed");
+		msg.setText(mailBody.toString());
 
 		javaMailSender.send(msg);
-
 	}
 }
