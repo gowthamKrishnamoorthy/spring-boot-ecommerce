@@ -1,25 +1,25 @@
 package com.gowtham.springbootecommerce.resource;
 
 import java.io.IOException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import javax.mail.MessagingException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.gowtham.springbootecommerce.model.CheckOut;
@@ -92,28 +92,36 @@ public class CheckOutResource {
 	 * @return all categories
 	 */
 	@PutMapping(value = "/put/{userName}")
-	public List<CheckOut> put(@PathVariable String userName, @RequestBody Integer productId,
-			@RequestBody Integer quantity,@RequestBody Boolean isIncrement) {
+	@Transactional
+	public List<CheckOut> put(@PathVariable String userName, @RequestParam Integer productId,
+			@RequestParam Integer quantity,@RequestParam Boolean isIncrement) {
 		List<CheckOut>  userCheckoutDataList = checkoutRespository.findByUsername(userName);
 		List<CheckOut>  tempCheckoutDataList = new ArrayList<CheckOut>();
 		if(userCheckoutDataList.isEmpty()) {
 			CheckOut userCheckoutData = new CheckOut(userName, productId, quantity);
 			tempCheckoutDataList.add(userCheckoutData);
 		}else {
+			boolean isExist = false;
 			for(CheckOut userCheckoutData : userCheckoutDataList) {
 				CheckOut tempUserCheckoutData = new CheckOut(userCheckoutData.getUsername(),
 						userCheckoutData.getProductId(), userCheckoutData.getQuantity());
 				if(tempUserCheckoutData.getProductId() == productId) {
 					int modifiedQuantity = isIncrement ?
 							tempUserCheckoutData.getQuantity() + quantity 
-							: tempUserCheckoutData.getQuantity() + quantity;
+							: tempUserCheckoutData.getQuantity() - quantity;
 					tempUserCheckoutData.setQuantity(modifiedQuantity);
+					isExist = true;
 				}
 				tempCheckoutDataList.add(tempUserCheckoutData);
+			}
+			if(!isExist && isIncrement) {
+				tempCheckoutDataList.add( new CheckOut(userName,
+						productId, quantity));
 			}
 		}
 
 		checkoutRespository.deleteByUsername(userName);
+		System.out.println(checkoutRespository.findAll().size());
 		checkoutRespository.saveAll(tempCheckoutDataList);
 		return checkoutRespository.findByUsername(userName);
 	}
@@ -145,8 +153,14 @@ public class CheckOutResource {
 				}
 			}
 		};
-
+		
 		thread.start();
+		try {
+			thread.wait();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		return true;
 	}
 
@@ -161,17 +175,21 @@ public class CheckOutResource {
 		SimpleMailMessage msg = new SimpleMailMessage();
 		if(userCheckoutDataList.isEmpty()) {
 			logger.error("User not found");
-			throw new EcommerceException("");
+			throw new EcommerceException("NO orders for the user");
 		}
 		String userName = userCheckoutDataList.get(0).getUsername();
-		User user = userRepository.findById(userName).get();
-		msg.setTo(user.getEmail());
-		msg.setSubject("Order conformation");
-		StringBuilder mailBody = new StringBuilder();
-		mailBody.append("Hello" + userName);
-		mailBody.append("\n" + "Your orders has been confirmed");
-		msg.setText(mailBody.toString());
+		Optional<User> userDataOptional = userRepository.findById(userName);
+		if(userDataOptional.isPresent()) {
+			User user = userDataOptional.get();
+			msg.setTo(user.getEmail());
+			msg.setSubject("Order conformation");
+			StringBuilder mailBody = new StringBuilder();
+			mailBody.append("Hello " + userName);
+			mailBody.append("\n" + "Your orders has been confirmed");
+			msg.setText(mailBody.toString());
 
-		javaMailSender.send(msg);
+			javaMailSender.send(msg);
+		}
+		
 	}
 }
