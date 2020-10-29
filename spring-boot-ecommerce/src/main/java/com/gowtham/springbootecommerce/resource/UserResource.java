@@ -24,7 +24,6 @@ import com.gowtham.springbootecommerce.repository.UserRepository;
  */
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin("*")
 public class UserResource {
 	
 	/** The user repository. */
