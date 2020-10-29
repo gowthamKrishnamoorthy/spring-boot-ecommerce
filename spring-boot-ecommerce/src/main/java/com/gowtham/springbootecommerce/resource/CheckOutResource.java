@@ -36,7 +36,6 @@ import com.gowtham.springbootecommerce.utils.EcommerceException;
  */
 @RestController
 @RequestMapping("/api/checkout")
-@CrossOrigin("*")
 public class CheckOutResource {
 	Logger logger = LoggerFactory.getLogger(CheckOutResource.class);
 
