@@ -25,7 +25,6 @@ import com.gowtham.springbootecommerce.repository.CategoryRepository;
  */
 @RestController
 @RequestMapping("/api/categories")
-@CrossOrigin("*")
 public class CategoryResource {
 
 	/** The category repository. */
